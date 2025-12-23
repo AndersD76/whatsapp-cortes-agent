@@ -2,29 +2,7 @@ from datetime import datetime
 from .cortes_manager import cortes_manager
 
 
-def formatar_data(data_str: str) -> str:
-    """Converte data de YYYY-MM-DD para DD/MM/YYYY."""
-    if not data_str:
-        return "-"
-    try:
-        data = datetime.strptime(data_str, "%Y-%m-%d")
-        return data.strftime("%d/%m/%Y")
-    except:
-        return data_str
-
-
-def get_emoji_prioridade(prioridade: str) -> str:
-    """Retorna emoji baseado na prioridade."""
-    emojis = {
-        "alta": "🔴",
-        "media": "🟡",
-        "baixa": "🟢"
-    }
-    return emojis.get(prioridade.lower(), "⚪")
-
-
 def processar_comando(texto: str) -> str:
-    """Processa o comando recebido e retorna a resposta."""
     texto = texto.lower().strip()
     partes = texto.split()
 
@@ -34,7 +12,6 @@ def processar_comando(texto: str) -> str:
     comando = partes[0]
     args = partes[1:] if len(partes) > 1 else []
 
-    # Mapeamento de comandos
     comandos = {
         "status": cmd_status,
         "pendentes": cmd_pendentes,
@@ -45,7 +22,10 @@ def processar_comando(texto: str) -> str:
         "finalizar": lambda: cmd_concluir(args),
         "detalhe": lambda: cmd_detalhe(args),
         "detalhes": lambda: cmd_detalhe(args),
-        "prioridade": lambda: cmd_prioridade(args),
+        "lista": lambda: cmd_lista(args),
+        "espessura": lambda: cmd_espessura(args),
+        "opd": lambda: cmd_opd(args),
+        "buscar": lambda: cmd_buscar(args),
         "recarregar": cmd_recarregar,
         "ajuda": cmd_ajuda,
         "help": cmd_ajuda,
@@ -55,169 +35,231 @@ def processar_comando(texto: str) -> str:
     if comando in comandos:
         func = comandos[comando]
         if callable(func):
-            return func() if not args or comando in ["status", "pendentes", "concluidos", "recarregar", "ajuda", "help", "menu"] else func()
+            return func() if comando in ["status", "pendentes", "concluidos", "recarregar", "ajuda", "help", "menu"] else func()
         return func
     else:
         return cmd_ajuda()
 
 
 def cmd_status() -> str:
-    """Retorna o status geral dos cortes."""
     status = cortes_manager.get_status_geral()
+    msg = f"""*STATUS DOS CORTES*
 
-    msg = f"""📊 *Status dos Cortes*
-
-✅ Concluídos: {status['concluidos']}
-⏳ Pendentes: {status['pendentes']}
-📋 Total: {status['total']}
-
-*Pendentes por prioridade:*
-🔴 Alta: {status['prioridade_alta']}
-🟡 Média: {status['prioridade_media']}
-🟢 Baixa: {status['prioridade_baixa']}
+Total: {status["total"]}
+Concluidos: {status["concluidos"]}
+Pendentes: {status["pendentes"]}
 
 _Digite *pendentes* para ver detalhes._"""
-
     return msg
 
 
 def cmd_pendentes() -> str:
-    """Lista os cortes pendentes."""
-    pendentes = cortes_manager.get_pendentes()
-
+    pendentes = cortes_manager.get_pendentes(15)
     if not pendentes:
-        return "✅ *Parabéns!* Não há cortes pendentes."
+        return "Nenhum corte pendente!"
 
-    msg = f"⏳ *Cortes Pendentes ({len(pendentes)})*\n"
-
+    msg = f"*CORTES PENDENTES ({len(pendentes)})*
+"
     for corte in pendentes:
-        emoji = get_emoji_prioridade(corte["prioridade"])
-        msg += f"""
-{emoji} *{corte['codigo']}* - {corte['descricao']}
-   📅 Previsto: {formatar_data(corte['data_prevista'])}
-   👤 Responsável: {corte['responsavel']}
-"""
+        msg += f"
+*{corte['numero']}* - Lista {corte['lista_corte']} - {corte['espessura']}mm"
+        if corte["tempo_corte"]:
+            msg += f" - {corte['tempo_corte']}"
+        if corte["opd"]:
+            msg += f"
+   OPD: {corte['opd']}"
 
-    msg += "\n_Para concluir, digite:_ *concluir <código>*"
+    msg += "
+
+_Para concluir:_ *concluir <numero>*"
     return msg
 
 
 def cmd_concluidos() -> str:
-    """Lista os cortes concluídos."""
-    concluidos = cortes_manager.get_concluidos()
-
+    concluidos = cortes_manager.get_concluidos(10)
     if not concluidos:
-        return "📋 Nenhum corte concluído ainda."
+        return "Nenhum corte concluido ainda."
 
-    msg = f"✅ *Cortes Concluídos ({len(concluidos)})*\n"
-
+    msg = f"*CORTES CONCLUIDOS (ultimos {len(concluidos)})*
+"
     for corte in concluidos:
-        msg += f"""
-• *{corte['codigo']}* - {corte['descricao']}
-   📅 Concluído: {formatar_data(corte['data_conclusao'])}
-   👤 Responsável: {corte['responsavel']}
-"""
+        msg += f"
+*{corte['numero']}* - Lista {corte['lista_corte']} - Corte: {corte['data_corte']}"
 
     return msg
 
 
 def cmd_concluir(args: list) -> str:
-    """Marca um corte como concluído."""
     if not args:
-        return "⚠️ Informe o código do corte.\n\n_Exemplo:_ *concluir CRT-001*"
+        return "Informe o numero do corte.
 
-    codigo = args[0].upper()
-    resultado = cortes_manager.concluir_corte(codigo)
+_Exemplo:_ *concluir 4835*"
+
+    numero = args[0]
+    resultado = cortes_manager.concluir_corte(numero)
 
     if not resultado["sucesso"]:
-        return f"❌ {resultado['erro']}"
+        return f"Erro: {resultado['erro']}"
 
     corte = resultado["corte"]
-    return f"""✅ Corte *{corte['codigo']}* marcado como concluído!
+    return f"""Corte *{corte['numero']}* marcado como CONCLUIDO!
 
-📝 {corte['descricao']}
-👤 Responsável: {corte['responsavel']}
-📅 Concluído em: {formatar_data(corte['data_conclusao'])}"""
+Lista: {corte['lista_corte']}
+Espessura: {corte['espessura']}mm
+Data: {corte['data_corte']}"""
 
 
 def cmd_detalhe(args: list) -> str:
-    """Mostra detalhes de um corte específico."""
     if not args:
-        return "⚠️ Informe o código do corte.\n\n_Exemplo:_ *detalhe CRT-001*"
+        return "Informe o numero do corte.
 
-    codigo = args[0].upper()
-    corte = cortes_manager.get_detalhe(codigo)
+_Exemplo:_ *detalhe 4835*"
+
+    numero = args[0]
+    corte = cortes_manager.get_detalhe(numero)
 
     if not corte:
-        return f"❌ Corte *{codigo}* não encontrado."
+        return f"Corte *{numero}* nao encontrado."
 
-    emoji = get_emoji_prioridade(corte["prioridade"])
-    status_emoji = "✅" if corte["status"] == "concluido" else "⏳"
+    status = "CONCLUIDO" if corte["data_corte"] else "PENDENTE"
 
-    msg = f"""📋 *Detalhes do Corte*
+    return f"""*DETALHES DO CORTE*
 
-*Código:* {corte['codigo']}
-*Descrição:* {corte['descricao']}
-*Status:* {status_emoji} {corte['status'].capitalize()}
-*Prioridade:* {emoji} {corte['prioridade'].capitalize()}
-*Responsável:* {corte['responsavel']}
-*Data Prevista:* {formatar_data(corte['data_prevista'])}
-*Data Conclusão:* {formatar_data(corte['data_conclusao'])}"""
+Numero: {corte['numero']}
+Lista: {corte['lista_corte']}
+Espessura: {corte['espessura']}mm
+Tempo: {corte['tempo_corte']}
+OPD: {corte['opd']}
+Entrega: {corte['data_entrega']}
+Status: {status}
+Data Corte: {corte['data_corte'] or '-'}"""
+
+
+def cmd_lista(args: list) -> str:
+    if not args:
+        return "Informe o numero da lista.
+
+_Exemplo:_ *lista 219*"
+
+    lista = args[0]
+    cortes = cortes_manager.get_por_lista(lista)
+
+    if not cortes:
+        return f"Nenhum corte encontrado para lista *{lista}*."
+
+    pendentes = [c for c in cortes if not c["data_corte"]]
+    concluidos = [c for c in cortes if c["data_corte"]]
+
+    msg = f"*LISTA {lista}*
+"
+    msg += f"Total: {len(cortes)} | Pendentes: {len(pendentes)} | Concluidos: {len(concluidos)}
+"
+
+    if pendentes:
+        msg += "
+*Pendentes:*"
+        for c in pendentes[:10]:
+            msg += f"
+- {c['numero']} ({c['espessura']}mm)"
 
     return msg
 
 
-def cmd_prioridade(args: list) -> str:
-    """Lista cortes por prioridade."""
+def cmd_espessura(args: list) -> str:
     if not args:
-        return "⚠️ Informe a prioridade: *alta*, *media* ou *baixa*\n\n_Exemplo:_ *prioridade alta*"
+        return "Informe a espessura.
 
-    prioridade = args[0].lower()
-    if prioridade not in ["alta", "media", "média", "baixa"]:
-        return "⚠️ Prioridade inválida. Use: *alta*, *media* ou *baixa*"
+_Exemplo:_ *espessura 6.35*"
 
-    if prioridade == "média":
-        prioridade = "media"
-
-    cortes = cortes_manager.get_por_prioridade(prioridade)
-    emoji = get_emoji_prioridade(prioridade)
+    espessura = args[0]
+    cortes = cortes_manager.get_por_espessura(espessura)
 
     if not cortes:
-        return f"{emoji} Nenhum corte pendente com prioridade *{prioridade}*."
+        return f"Nenhum corte pendente com espessura *{espessura}*."
 
-    msg = f"{emoji} *Cortes Pendentes - Prioridade {prioridade.capitalize()} ({len(cortes)})*\n"
+    msg = f"*PENDENTES - {espessura}mm ({len(cortes)})*
+"
+    for c in cortes[:15]:
+        msg += f"
+*{c['numero']}* - Lista {c['lista_corte']}"
 
-    for corte in cortes:
-        msg += f"""
-• *{corte['codigo']}* - {corte['descricao']}
-   📅 Previsto: {formatar_data(corte['data_prevista'])}
-   👤 {corte['responsavel']}
-"""
+    return msg
+
+
+def cmd_opd(args: list) -> str:
+    if not args:
+        return "Informe a OPD.
+
+_Exemplo:_ *opd 290*"
+
+    opd = args[0]
+    cortes = cortes_manager.get_por_opd(opd)
+
+    if not cortes:
+        return f"Nenhum corte encontrado para OPD *{opd}*."
+
+    pendentes = [c for c in cortes if not c["data_corte"]]
+    concluidos = [c for c in cortes if c["data_corte"]]
+
+    msg = f"*OPD {opd}*
+"
+    msg += f"Total: {len(cortes)} | Pendentes: {len(pendentes)} | Concluidos: {len(concluidos)}
+"
+
+    if pendentes:
+        msg += "
+*Pendentes:*"
+        for c in pendentes[:10]:
+            msg += f"
+- {c['numero']} ({c['espessura']}mm)"
+
+    return msg
+
+
+def cmd_buscar(args: list) -> str:
+    if not args:
+        return "Informe o termo de busca.
+
+_Exemplo:_ *buscar 4835*"
+
+    termo = " ".join(args)
+    resultados = cortes_manager.buscar(termo)
+
+    if not resultados:
+        return f"Nenhum resultado para *{termo}*."
+
+    msg = f"*RESULTADOS ({len(resultados)})*
+"
+    for c in resultados:
+        status = "OK" if c["data_corte"] else "PEND"
+        msg += f"
+[{status}] *{c['numero']}* - Lista {c['lista_corte']}"
 
     return msg
 
 
 def cmd_recarregar() -> str:
-    """Recarrega a planilha do disco."""
     cortes_manager.recarregar()
     status = cortes_manager.get_status_geral()
-    return f"""🔄 Planilha recarregada com sucesso!
+    return f"""Planilha recarregada!
 
-📋 Total de cortes: {status['total']}
-⏳ Pendentes: {status['pendentes']}
-✅ Concluídos: {status['concluidos']}"""
+Total: {status['total']}
+Pendentes: {status['pendentes']}
+Concluidos: {status['concluidos']}"""
 
 
 def cmd_ajuda() -> str:
-    """Retorna a lista de comandos disponíveis."""
-    return """🤖 *Agente de Cortes - Comandos*
+    return """*COMANDOS DISPONIVEIS*
 
-📊 *status* - Resumo geral dos cortes
-⏳ *pendentes* - Lista cortes pendentes
-✅ *concluidos* - Lista cortes concluídos
-✔️ *concluir <código>* - Marca corte como concluído
-📋 *detalhe <código>* - Detalhes de um corte
-🎯 *prioridade <alta/media/baixa>* - Filtra por prioridade
-🔄 *recarregar* - Atualiza lista do arquivo
+*status* - Resumo geral
+*pendentes* - Lista pendentes
+*concluidos* - Lista concluidos
+*concluir <num>* - Marca como feito
+*detalhe <num>* - Detalhes do corte
+*lista <num>* - Cortes de uma lista
+*espessura <mm>* - Filtra por espessura
+*opd <num>* - Cortes de uma OPD
+*buscar <termo>* - Busca geral
+*recarregar* - Atualiza planilha
 
-_Exemplo:_ *concluir CRT-001*"""
+_Exemplo:_ *concluir 4835*"""
