@@ -1,0 +1,7 @@
+codigo,descricao,status,data_prevista,data_conclusao,responsavel,prioridade
+CRT-001,Corte peça A - lote 50 unidades,pendente,2025-12-23,,João Silva,alta
+CRT-002,Corte peça B - lote 30 unidades,pendente,2025-12-23,,Maria Santos,alta
+CRT-003,Corte peça C - lote 100 unidades,pendente,2025-12-24,,Pedro Costa,media
+CRT-004,Corte peça D - lote 25 unidades,concluido,2025-12-22,2025-12-22,João Silva,alta
+CRT-005,Corte peça E - lote 80 unidades,pendente,2025-12-24,,Ana Oliveira,baixa
+CRT-006,Corte peça F - lote 45 unidades,concluido,2025-12-21,2025-12-21,Maria Santos,media
